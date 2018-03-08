@@ -22,7 +22,8 @@ class MSVDQA(object):
 
         self.video_feature = tables.open_file(
             os.path.join(preprocess_dir, 'video_feature_20.h5'))
-
+        
+        
         # contains encode, for fast generate batch by saving encode time
         self.train_qa = pd.read_json(
             os.path.join(preprocess_dir, 'train_qa_encode.json'))
@@ -175,6 +176,8 @@ class MSRVTTQA(object):
         self.video_feature = tables.open_file(
             os.path.join(preprocess_dir, 'video_feature_20.h5'))
         """
+        self.audio_feature = tables.open_file(os.path.join(preprocess_dir, 'audio_train_feature.h5'))
+
         # contains encode, for fast generate batch by saving encode time
         self.train_qa = pd.read_json(
             os.path.join(preprocess_dir, 'train_qa_encode.json'))
@@ -245,11 +248,9 @@ class MSRVTTQA(object):
     def get_train_batch(self):
         """Get [train_batch_size] examples as one train batch. Both question and answer
         are converted to int. The data batch is selected from short buckets to long buckets."""
-        vgg_batch = []
-        c3d_batch = []
         question_batch = []
         answer_batch = []
-
+        audio_batch = []
         bucket = self.train_buckets[self.current_bucket]
         start = self.train_batch_idx[
             self.current_bucket] * self.train_batch_size
@@ -264,8 +265,8 @@ class MSRVTTQA(object):
             qid = [int(x) for x in question_encode[i].split(',')]
             qid = np.pad(qid, (0, batch_length - len(qid)), 'constant')
             question_batch.append(qid)
-            #vgg_batch.append(self.video_feature.root.vgg[video_ids[i]])
-            #c3d_batch.append(self.video_feature.root.c3d[video_ids[i]])
+            idx = start + i
+            audio_batch.append(self.audio_feature.root.mfcc[idx])
 
         self.train_batch_idx[self.current_bucket] += 1
         # if current bucket is ran out, use next bucket.
@@ -275,7 +276,7 @@ class MSRVTTQA(object):
         if self.current_bucket == len(self.train_batch_total):
             self.has_train_batch = False
 
-        return vgg_batch, c3d_batch, question_batch, answer_batch
+        return audio_batch, question_batch, answer_batch
 
     def get_val_example(self):
         """Get one val example. Only question is converted to int."""

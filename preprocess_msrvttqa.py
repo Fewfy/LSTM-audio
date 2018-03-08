@@ -53,12 +53,25 @@ def extract_c3d(video_directory):
 
 
 def extract_mfcc_feature(video_directory):
-    features = list()
+    features = np.empty((0, 180))
     for video_file in os.listdir(video_directory):
-        wave, sample_rate = librosa.load(os.path.join(video_directory, video_file))
-        mfcc = librosa.feature.mfcc(wave, sample_rate)
-        mfcc = np.pad(mfcc, ((0, 0), (0, 80-len(mfcc[0]))), mode='constant', constant_values=0)
-        features.append(np.array(mfcc))
+        X, sample_rate = librosa.load(os.path.join(video_directory, video_file))
+    
+        # sftf
+        stft = np.abs(librosa.stft(X))
+    
+        # mfcc
+        mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T, axis=0)
+    
+        # chroma
+        chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T, axis=0)
+    
+        # melspectrogram
+        mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T, axis=0)
+    
+        ext_features = np.hstack([mfccs, chroma, mel])
+        features = np.vstack([features, ext_features])
+    features = np.array(features)
     return features
 
 
@@ -75,7 +88,9 @@ def extract_video_feature(video_directory, feature_path):
 
 def extract_audio_feature(video_directory, feature_path):
     h5file = tables.open_file(feature_path, 'w', 'Extracted audio features of the MSRVTT-QA dataset')
-    mfcc_features = extract_audio_feature()
+    mfcc_features = extract_mfcc_feature(video_directory)
+    h5file.create_array('/', 'mfcc', mfcc_features, 'train audio feature')
+    h5file.close()
     
 
 def create_answerset(trainqa_path, answerset_path):
@@ -187,23 +202,24 @@ def main():
     #create_answerset(os.path.join('data', 'train_qa.json'),
     #                 'data/msrvtt_qa/answer_set.txt')
 
-    create_vocab(os.path.join('data', 'train_qa.json'),
-                 'data/msrvtt_qa/answer_set.txt',
-                 'data/msrvtt_qa/vocab.txt',
-                 'data/msrvtt_qa/video_id.txt')
+    #create_vocab(os.path.join('data', 'train_qa.json'),
+    #             'data/msrvtt_qa/answer_set.txt',
+    #             'data/msrvtt_qa/vocab.txt',
+    #             'data/msrvtt_qa/video_id.txt')
 
-    prune_embedding('data/msrvtt_qa/vocab.txt',
-                    'util/glove.6B.300d.txt',
-                    'data/msrvtt_qa/word_embedding.npy')
+    #prune_embedding('data/msrvtt_qa/vocab.txt',
+    #                'util/glove.6B.300d.txt',
+    #                'data/msrvtt_qa/word_embedding.npy')
 
-    create_qa_encode('data',
-                     'data/msrvtt_qa/vocab.txt',
-                     'data/msrvtt_qa/answer_set.txt',
-                     'data/msrvtt_qa/train_qa_encode.json',
-                     'data/msrvtt_qa/val_qa_encode.json',
-                     'data/msrvtt_qa/test_qa_encode.json',
-                     'data/msrvtt_qa/video_id.txt')
-
+    #create_qa_encode('data',
+    #                 'data/msrvtt_qa/vocab.txt',
+    #                 'data/msrvtt_qa/answer_set.txt',
+    #                 'data/msrvtt_qa/train_qa_encode.json',
+    #                 'data/msrvtt_qa/val_qa_encode.json',
+    #                 'data/msrvtt_qa/test_qa_encode.json',
+    #                 'data/msrvtt_qa/video_id.txt')
+    extract_audio_feature('data/msrvtt/train_audio', 'data/msrvtt_qa/audio_train_feature.h5')
+    
 
 if __name__ == '__main__':
     main()
